@@ -1,0 +1,108 @@
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local Mouse = game.Players.LocalPlayer:GetMouse()
+
+-- Configuration States
+local recording = false
+local playing = false
+local mouse_data = {}
+local play_index = 1
+
+-- GUI Construction
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 200, 0, 160)
+Main.Position = UDim2.new(0, 50, 0.5, -80)
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+
+local function createLabel(text, pos)
+    local l = Instance.new("TextLabel", Main)
+    l.Size = UDim2.new(1, 0, 0, 25)
+    l.Position = pos
+    l.Text = text
+    l.TextColor3 = Color3.new(1, 1, 1)
+    l.BackgroundTransparency = 1
+    l.Font = Enum.Font.Code
+    return l
+end
+
+local Title = createLabel("MACRO: [7]REC [8]PLAY", UDim2.new(0,0,0,5))
+local SpeedInput = Instance.new("TextBox", Main)
+SpeedInput.Size = UDim2.new(0.8, 0, 0, 25)
+SpeedInput.Position = UDim2.new(0.1, 0, 0, 40)
+SpeedInput.PlaceholderText = "Speed (Default 1)"
+SpeedInput.Text = "1"
+
+local FOVInput = Instance.new("TextBox", Main)
+FOVInput.Size = UDim2.new(0.8, 0, 0, 25)
+FOVInput.Position = UDim2.new(0.1, 0, 0, 75)
+FOVInput.PlaceholderText = "FOV Visual Size"
+FOVInput.Text = "60"
+
+-- Visual FOV Representation
+local VisualCircle = Instance.new("Frame", ScreenGui)
+VisualCircle.BackgroundColor3 = Color3.new(1, 1, 1)
+VisualCircle.BackgroundTransparency = 0.8
+VisualCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+local Corner = Instance.new("UICorner", VisualCircle)
+Corner.CornerRadius = UDim.new(1, 0)
+
+-- Core Logic
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    
+    -- [7] Toggle Record
+    if input.KeyCode == Enum.KeyCode.Seven then
+        recording = not recording
+        playing = false
+        if recording then
+            mouse_data = {}
+            Title.Text = "RECORDING..."
+            Title.TextColor3 = Color3.new(1, 0, 0)
+        else
+            Title.Text = "SAVED: " .. #mouse_data .. " PTS"
+            Title.TextColor3 = Color3.new(1, 1, 1)
+        end
+        
+    -- [8] Toggle Play
+    elseif input.KeyCode == Enum.KeyCode.Eight then
+        if #mouse_data > 0 then
+            playing = not playing
+            play_index = 1
+            Title.Text = playing and "PLAYING..." or "PAUSED"
+            Title.TextColor3 = playing and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local currentSpeed = tonumber(SpeedInput.Text) or 1
+    local currentFOV = tonumber(FOVInput.Text) or 60
+    
+    -- Update FOV circle
+    VisualCircle.Visible = playing or recording
+    VisualCircle.Size = UDim2.new(0, currentFOV * 2, 0, currentFOV * 2)
+    VisualCircle.Position = UDim2.new(0, Mouse.X, 0, Mouse.Y)
+
+    -- Record relative movement (Delta)
+    if recording then
+        local delta = UIS:GetMouseDelta()
+        if delta.Magnitude > 0 then
+            table.insert(mouse_data, {x = delta.X, y = delta.Y})
+        end
+    end
+
+    -- Playback recorded movement
+    if playing and #mouse_data > 0 then
+        local data = mouse_data[play_index]
+        if mousemoverel then
+            -- Moves hardware mouse relative to current position
+            mousemoverel(data.x * currentSpeed, data.y * currentSpeed)
+        end
+        
+        play_index = (play_index % #mouse_data) + 1
+    end
+end)
